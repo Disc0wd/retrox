@@ -1,0 +1,7 @@
+<RNMDL>
+from gn-z11 declare text, images
+
+[container id="main"]
+  [h1]Hello RetroX[/h1]
+  [paragraph]This is my first permanent site on RetroNet.[/paragraph]
+[/container]

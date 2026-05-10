@@ -1,0 +1,8 @@
+<RNMDL>
+from gn-z11 declare text, images
+
+[container]
+  [h1]Missing Alt Text[/h1]
+  [image path="photo.jpg" alt="photo"]
+  [image path="other.jpg" alt=""]
+[/container]

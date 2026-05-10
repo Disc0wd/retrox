@@ -1,0 +1,9 @@
+<RNMDL>
+from gn-z11 declare text, images
+
+[container]
+  [h1]Bad Nesting Example[/h1]
+  [paragraph]
+    [h2]Cannot nest heading inside paragraph[/h2]
+  [/paragraph]
+[/container]

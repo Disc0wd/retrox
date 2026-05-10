@@ -1,0 +1,8 @@
+<RNMDL>
+from gn-z11 declare text, images
+from gn-z11 declare text
+
+[container]
+  [h1]This document is invalid[/h1]
+  [paragraph]Text module declared twice.[/paragraph]
+[/container]

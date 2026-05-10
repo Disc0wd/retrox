@@ -1,0 +1,15 @@
+[package]
+name = "retrox"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.95.0"
+authors = ["RetroX Project"]
+description = "RNMDL GN-Z11 Parser and Terminal Renderer"
+license = "CC-BY-4.0"
+
+[[bin]]
+name = "retrox"
+path = "src/main.rs"
+
+[dependencies]
+# Zero external dependencies - permanence by design

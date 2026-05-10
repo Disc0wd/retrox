@@ -1,0 +1,34 @@
+<RNMDL>
+from gn-z11 declare text, images
+implement_bugfixsets = True
+
+[container id="main"]
+  [section id="header"]
+    [h1]Jane Smith[/h1]
+    [paragraph]Photographer and digital archivist. Welcome to my permanent home on RetroNet.[/paragraph]
+  [/section]
+
+  [section id="about"]
+    [h2]About Me[/h2]
+    [paragraph]I have been photographing landscapes and urban environments since 2015. I moved my portfolio to RetroNet because I wanted permanence. No platform pivots. No broken links. Just work that lasts.[/paragraph]
+    [image path="portrait.jpg" alt="Black and white portrait of Jane Smith standing in front of a bookshelf"]
+  [/section]
+
+  [section id="work"]
+    [h2]Selected Work[/h2]
+
+    [container id="project-mountains"]
+      [h3]Mountain Series[/h3]
+      [paragraph]A study of light and shadow across alpine environments. Shot over three seasons in the Alps.[/paragraph]
+      [image path="mountains.jpg" alt="Snow-capped mountain peaks at golden hour with long shadows across the valley"]
+    [/container]
+
+    [container id="project-urban"]
+      [h3]Urban Geometry[/h3]
+      [paragraph]Abstract compositions drawn from the built environment. Exploring lines, repetition, and negative space.[/paragraph]
+      [image path="urban.jpg" alt="Looking upward at glass skyscrapers converging at a central point against a blue sky"]
+    [/container]
+  [/section]
+
+  <!-- Contact section to be added in future update -->
+[/container]
