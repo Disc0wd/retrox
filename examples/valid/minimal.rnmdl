@@ -1,7 +1,7 @@
 <RNMDL>
 from gn-z11 declare text, images
 
-[container id="main"]
-  [h1]Hello RetroX[/h1]
-  [paragraph]This is my first permanent site on RetroNet.[/paragraph]
+[container]
+  [h1]Image Test[/h1]
+  [image path="test.png" alt="A test image showing colors and shapes"]
 [/container]

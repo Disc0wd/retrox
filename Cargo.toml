@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2021"
 rust-version = "1.95.0"
 authors = ["RetroX Project"]
-description = "RNMDL GN-Z11 Parser and Terminal Renderer"
+description = "RNMDL GN-Z11 Parser, Validator and Graphical Renderer"
 license = "CC-BY-4.0"
 
 [[bin]]
@@ -12,4 +12,18 @@ name = "retrox"
 path = "src/main.rs"
 
 [dependencies]
-# Zero external dependencies - permanence by design
+
+[target.'cfg(target_os = "linux")'.dependencies]
+xcb = "=1.7.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "=0.52.0", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+]}
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.5.2"
+objc2-app-kit = "=0.2.2"
+objc2-foundation = "=0.2.2"

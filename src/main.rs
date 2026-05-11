@@ -15,6 +15,10 @@ mod ast;
 mod parser;
 mod validator;
 mod renderer;
+mod gui;
+mod image;
+mod font;
+mod platform;
 
 use std::env;
 use std::fs;
@@ -81,6 +85,15 @@ fn main() {
             println!("  Language: Rust 1.95.0");
             println!("  Edition:  2021");
             println!("  Spec:     RNMDL GN-Z11 (v0.0.0)");
+        }
+        
+        "gui" | "g" => {
+            if args.len() < 3 {
+            eprintln!("{}{}Error:{} 'gui' requires a file path.", BOLD, RED, RESET);
+            eprintln!("  Usage: retrox gui <file.rnmdl>");
+            process::exit(1);
+            }
+            cmd_gui(&args[2]);
         }
 
         unknown => {
@@ -256,6 +269,14 @@ fn print_source_context(source: &str, line: usize, col: usize) {
     eprintln!();
 }
 
+fn cmd_gui(path: &str) {
+    let mut browser = gui::browser::Browser::new("RetroX", 900, 650);
+    if let Err(e) = browser.load(path) {
+        eprintln!("{}{}Error:{} {}", BOLD, RED, RESET, e);
+        process::exit(1);
+    }
+    browser.run();
+}
 // ─── Help ──────────────────────────────────────────────────
 
 fn print_usage() {
@@ -268,6 +289,7 @@ fn print_usage() {
     println!("{}COMMANDS:{}", BOLD, RESET);
     println!("  {}render{}   <file.rnmdl>   Parse, validate and render a document", GREEN, RESET);
     println!("  {}validate{} <file.rnmdl>   Validate without rendering", GREEN, RESET);
+    println!("  {}gui{}      <file.rnmdl>   Open graphical browser", GREEN, RESET);
     println!("  {}check{}    <file.rnmdl>   Render without meta information", GREEN, RESET);
     println!("  {}version{}                 Show version information", GREEN, RESET);
     println!("  {}help{}                    Show this help message", GREEN, RESET);
