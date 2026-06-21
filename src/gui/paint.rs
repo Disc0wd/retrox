@@ -130,25 +130,31 @@ pub fn draw_text_wrapped(
 }
 
 pub fn draw_image(
-    buf:    &mut PixelBuffer,
-    image:  &Image,
-    x:      i32,
-    y:      i32,
-    w:      i32,
-    h:      i32,
+    buf:   &mut PixelBuffer,
+    image: &Image,
+    x:     i32,
+    y:     i32,
+    w:     i32,
+    h:     i32,
 ) {
-    let x0 = x.max(0);
-    let y0 = y.max(0);
-    let x1 = (x + w).min(buf.width as i32);
-    let y1 = (y + h).min(buf.height as i32);
+    let x0 = x.max(0) as u32;
+    let y0 = y.max(0) as u32;
+    let x1 = (x + w).min(buf.width as i32).max(0) as u32;
+    let y1 = (y + h).min(buf.height as i32).max(0) as u32;
 
     for py in y0..y1 {
+        let src_y = ((py as i32 - y) as u64 * image.height as u64 / h as u64) as u32;
+        let src_row = (src_y * image.width) as usize;
+        let dst_row = (py * buf.width) as usize;
         for px in x0..x1 {
-            let sx = ((px - x) as f32 / w as f32 * image.width  as f32) as u32;
-            let sy = ((py - y) as f32 / h as f32 * image.height as f32) as u32;
-            let (r, g, b, a) = image.get_pixel(sx, sy);
-            if a > 0 {
-                buf.set_pixel(px as u32, py as u32, r, g, b, a);
+            let src_x = ((px as i32 - x) as u64 * image.width as u64 / w as u64) as u32;
+            let si = (src_row + src_x as usize) * 4;
+            let di = (dst_row + px as usize) * 4;
+            if si + 3 < image.pixels.len() && di + 3 < buf.data.len() {
+                buf.data[di]     = image.pixels[si];
+                buf.data[di + 1] = image.pixels[si + 1];
+                buf.data[di + 2] = image.pixels[si + 2];
+                buf.data[di + 3] = 255;
             }
         }
     }

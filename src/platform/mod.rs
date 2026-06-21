@@ -1,6 +1,6 @@
 // ============================================================
 // RetroX Platform Abstraction Layer
-// Defines the common interface all platforms must implement.
+// Linux/XCB only. macOS and Windows planned for future versions.
 // Rust 1.95.0 | Edition 2021 | FROZEN at GN-Z11
 // ============================================================
 
@@ -30,16 +30,18 @@ pub enum Event {
     Close,
     KeyPress(Key),
     MouseClick { x: u32, y: u32, button: MouseButton },
-    MouseMove { x: u32, y: u32 },
-    Scroll(i32),           // positive = down, negative = up
+    MouseMove  { x: u32, y: u32 },
+    Scroll(i32),                         // positive = down, negative = up
     Resize { width: u32, height: u32 },
 }
 
-/// RGBA pixel buffer
+// ─── Pixel Buffer ──────────────────────────────────────────
+
+/// RGBA pixel buffer. 4 bytes per pixel: R, G, B, A.
 pub struct PixelBuffer {
     pub width:  u32,
     pub height: u32,
-    pub data:   Vec<u8>,   // RGBA, 4 bytes per pixel
+    pub data:   Vec<u8>,
 }
 
 impl PixelBuffer {
@@ -51,6 +53,7 @@ impl PixelBuffer {
         }
     }
 
+    #[inline]
     pub fn set_pixel(&mut self, x: u32, y: u32, r: u8, g: u8, b: u8, a: u8) {
         if x >= self.width || y >= self.height { return; }
         let idx = ((y * self.width + x) * 4) as usize;
@@ -60,6 +63,7 @@ impl PixelBuffer {
         self.data[idx + 3] = a;
     }
 
+    #[inline]
     pub fn get_pixel(&self, x: u32, y: u32) -> (u8, u8, u8, u8) {
         if x >= self.width || y >= self.height { return (0, 0, 0, 0); }
         let idx = ((y * self.width + x) * 4) as usize;
@@ -82,7 +86,8 @@ impl PixelBuffer {
     }
 }
 
-/// Platform window trait - every platform implements this
+// ─── Platform Window Trait ─────────────────────────────────
+
 pub trait PlatformWindow {
     fn new(title: &str, width: u32, height: u32) -> Self where Self: Sized;
     fn present(&mut self, buffer: &PixelBuffer);
@@ -92,18 +97,12 @@ pub trait PlatformWindow {
     fn set_title(&mut self, title: &str);
 }
 
-// Platform selection
+// ─── Platform Selection ────────────────────────────────────
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::LinuxWindow as NativeWindow;
 
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-pub use windows::WindowsWindow as NativeWindow;
-
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "macos")]
-pub use macos::MacosWindow as NativeWindow;
+// Wayland support planned for a future RNMDL module version.
+// The PlatformWindow trait above is the extension point.
