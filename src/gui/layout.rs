@@ -6,8 +6,9 @@
 // ============================================================
 
 use crate::ast::Node;
-use crate::image::{Image, load_image};
 use crate::font;
+use crate::image::stb::resize_stb;
+use crate::image::{Image, load_image};
 
 pub const MARGIN_X:   i32 = 40;
 pub const LINE_H:     i32 = 20;
@@ -187,7 +188,7 @@ fn decode_images_parallel(jobs: Vec<ImageJob>) -> Vec<ImageResult> {
                     let scale   = scale_w.min(scale_h).min(1.0); // never upscale
                     let sw = ((img.width  as f32 * scale) as u32).max(1);
                     let sh = ((img.height as f32 * scale) as u32).max(1);
-                    let scaled = scale_image(&img, sw, sh);
+                    let scaled = resize_stb(&img, sw, sh);
                     ImageResult {
                         path:  job.path,
                         alt:   job.alt,
@@ -295,21 +296,3 @@ fn layout_node(
     }
 }
 
-// ─── Image Scaling ─────────────────────────────────────────
-
-fn scale_image(src: &Image, w: u32, h: u32) -> Image {
-    let mut dst = Image::new(w, h);
-    if w == 0 || h == 0 { return dst; }
-    for dy in 0..h {
-        let sy            = (dy as u64 * src.height as u64 / h as u64) as u32;
-        let src_row_start = (sy * src.width) as usize * 4;
-        let dst_row_start = (dy * w) as usize * 4;
-        for dx in 0..w {
-            let sx = (dx as u64 * src.width as u64 / w as u64) as u32;
-            let si = src_row_start + sx as usize * 4;
-            let di = dst_row_start + dx as usize * 4;
-            dst.pixels[di..di+4].copy_from_slice(&src.pixels[si..si+4]);
-        }
-    }
-    dst
-}

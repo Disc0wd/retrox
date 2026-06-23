@@ -1,25 +1,15 @@
 // ============================================================
 // RetroX Image Decoder
-// Supports PNG (ISO/IEC 15948) and JPEG (ISO/IEC 10918-1).
-// Zero external dependencies. No compression on output pixels.
 // Rust 1.95.0 | Edition 2021 | FROZEN at GN-Z11
 // ============================================================
 
-mod png;
-mod jpeg;
+pub mod stb;
 
-pub use png::decode_png;
-pub use jpeg::decode_jpeg;
-
-// ─── Image ─────────────────────────────────────────────────
-
-/// Decoded image. Pixels stored as RGBA, 4 bytes per pixel,
-/// row-major, top-to-bottom, left-to-right. No compression.
 #[derive(Debug, Clone)]
 pub struct Image {
     pub width:  u32,
     pub height: u32,
-    pub pixels: Vec<u8>,
+    pub pixels: Vec<u8>, // RGBA, 4 bytes per pixel
 }
 
 impl Image {
@@ -49,8 +39,6 @@ impl Image {
     }
 }
 
-// ─── Error ─────────────────────────────────────────────────
-
 #[derive(Debug)]
 pub struct ImageError(pub String);
 
@@ -60,34 +48,10 @@ impl std::fmt::Display for ImageError {
     }
 }
 
-impl From<&str> for ImageError {
-    fn from(s: &str) -> Self { ImageError(s.to_string()) }
-}
-
-// ─── Loader ────────────────────────────────────────────────
-
-/// Load an image from a file path, auto-detecting PNG or JPEG.
 pub fn load_image(path: &str) -> Result<Image, ImageError> {
     let data = std::fs::read(path)
         .map_err(|e| ImageError(format!("Cannot read '{}': {}", path, e)))?;
 
-    if data.len() < 4 {
-        return Err(ImageError(format!("File '{}' is too small to be an image", path)));
-    }
-
-    // PNG magic: 89 50 4E 47
-    if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
-        return decode_png(&data)
-            .map_err(|e| ImageError(format!("PNG decode failed for '{}': {}", path, e.0)));
-    }
-
-    // JPEG magic: FF D8 FF
-    if data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
-        return decode_jpeg(&data)
-            .map_err(|e| ImageError(format!("JPEG decode failed for '{}': {}", path, e.0)));
-    }
-
-    Err(ImageError(format!(
-        "Unsupported image format for '{}'. Supported: PNG, JPEG (jpg/jpeg)", path
-    )))
+    stb::decode_stb(&data)
+        .map_err(|e| ImageError(format!("STB decode failed for '{}': {}", path, e)))
 }

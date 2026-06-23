@@ -14,4 +14,9 @@ path = "src/main.rs"
 [dependencies]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-xcb = "=1.7.0"
+wayland-client   = "=0.31.14"
+wayland-protocols = { version = "=0.31.2", features = ["client", "staging"] }
+libc = "=0.2.186"
+
+[build-dependencies]
+cc = "1"
