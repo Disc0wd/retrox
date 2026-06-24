@@ -14,10 +14,36 @@ path = "src/main.rs"
 [dependencies]
 rnmdl = { path = "../rnmdl" }
 
+# ─────────────────────────────────────────────
+# Linux backend (Wayland)
+# ─────────────────────────────────────────────
 [target.'cfg(target_os = "linux")'.dependencies]
 wayland-client    = "=0.31.14"
 wayland-protocols = { version = "=0.31.2", features = ["client", "staging"] }
 libc              = "=0.2.186"
 
+# ─────────────────────────────────────────────
+# Windows backend (Win32 GDI)
+# ─────────────────────────────────────────────
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+] }
+
+# ─────────────────────────────────────────────
+# macOS backend (Cocoa / Objective-C runtime)
+# ─────────────────────────────────────────────
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5"
+objc2-app-kit = "0.2"
+objc2-foundation = "0.2"
+
+# ─────────────────────────────────────────────
+# build tools (shared)
+# ─────────────────────────────────────────────
 [build-dependencies]
 cc = "1"

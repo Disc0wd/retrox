@@ -13,17 +13,55 @@ use windows_sys::Win32::{
         GetDC, ReleaseDC, RGBQUAD,
     },
     System::LibraryLoader::GetModuleHandleW,
-    UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW,
-        LoadCursorW, MSG, PeekMessageW, PostQuitMessage, RegisterClassExW,
-        SetWindowTextW, ShowWindow, TranslateMessage, WNDCLASSEXW,
-        CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, IDC_ARROW, PM_REMOVE,
-        SW_SHOW, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
-        WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_PAINT, WM_QUIT, WM_SIZE,
-        WM_RBUTTONDOWN, WM_MBUTTONDOWN, WS_OVERLAPPEDWINDOW,
-        VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_PRIOR, VK_NEXT,
-        VK_RETURN, VK_ESCAPE, VK_BACK, GET_WHEEL_DELTA_WPARAM,
-        WHEEL_DELTA,
+    UI::{
+        Input::KeyboardAndMouse::{
+            VK_UP,
+            VK_DOWN,
+            VK_LEFT,
+            VK_RIGHT,
+            VK_PRIOR,
+            VK_NEXT,
+            VK_RETURN,
+            VK_ESCAPE,
+            VK_BACK,
+
+        },
+        WindowsAndMessaging::{
+            CreateWindowExW,
+            DefWindowProcW,
+            DispatchMessageW,
+            LoadCursorW,
+            MSG,
+            PeekMessageW,
+            PostQuitMessage,
+            RegisterClassExW,
+            SetWindowTextW,
+            ShowWindow,
+            TranslateMessage,
+            WNDCLASSEXW,
+
+            CS_HREDRAW,
+            CS_VREDRAW,
+            CW_USEDEFAULT,
+            IDC_ARROW,
+            PM_REMOVE,
+            SW_SHOW,
+
+            WM_CLOSE,
+            WM_DESTROY,
+            WM_KEYDOWN,
+            WM_LBUTTONDOWN,
+            WM_MOUSEMOVE,
+            WM_MOUSEWHEEL,
+            WM_PAINT,
+            WM_QUIT,
+            WM_SIZE,
+            WM_RBUTTONDOWN,
+            WM_MBUTTONDOWN,
+            WS_OVERLAPPEDWINDOW,
+            
+            WHEEL_DELTA,
+        },
     },
 };
 
@@ -130,7 +168,7 @@ unsafe extern "system" fn wnd_proc(
         }
 
         WM_MOUSEWHEEL => {
-            let delta = GET_WHEEL_DELTA_WPARAM(wparam) as i32;
+            let delta = ((wparam >> 16) & 0xffff) as i16 as i32;
             let scroll = -(delta / WHEEL_DELTA as i32) * 3;
             if let Ok(mut q) = EVENT_QUEUE.lock() {
                 q.push(Event::Scroll(scroll));
