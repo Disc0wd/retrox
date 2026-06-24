@@ -6,27 +6,14 @@
 // ============================================================
 
 use objc2::runtime::AnyObject;
-use objc2::{msg_send, ClassType};
+use objc2::{msg_send, msg_send_id, ClassType};
 use objc2_app_kit::{
-    NSApplication,
-    // NSBackingStoreType::Buffered == 2 (NSBackingStoreBuffered).
-    // The constant is only compiled in when BOTH "NSGraphics" (for the type)
-    // AND "NSWindow" (for the impl block that adds Buffered) are enabled.
-    // Since we're calling initWithContentRect:styleMask:backing:defer: via
-    // raw msg_send! anyway, it's simpler and more robust to pass the integer.
-    NSBitmapImageRep,    // lives behind "NSBitmapImageRep" + "NSImageRep" features
-    NSEvent,
-    NSEventMask,
-    NSEventType,
-    NSGraphicsContext,   // lives behind "NSGraphicsContext" feature
-    NSScreen,
-    NSView,
-    NSWindow,
-    NSWindowStyleMask,
+    NSApplication, NSBackingStoreType, NSBitmapImageRep,
+    NSEventMask, NSEventType, NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{ns_string, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{NSRect, NSPoint, NSSize, NSString};
 
-use super::{Event, Key, MouseButton, PixelBuffer, PlatformWindow};
+use super::{PlatformWindow, PixelBuffer, Event, Key, MouseButton};
 use std::sync::Mutex;
 
 static EVENT_QUEUE: Mutex<Vec<Event>> = Mutex::new(Vec::new());
@@ -43,14 +30,12 @@ pub struct MacosWindow {
 impl PlatformWindow for MacosWindow {
     fn new(title: &str, width: u32, height: u32) -> Self {
         unsafe {
-            // ── NSApplication ────────────────────────────────────────────
-            // sharedApplication is a class method; use msg_send! on the class.
-            let app: *mut AnyObject =
-                msg_send![NSApplication::class(), sharedApplication];
-            // NSApplicationActivationPolicyRegular == 0
-            let _: () = msg_send![app, setActivationPolicy: 0i64];
+            // Initialize NSApplication
+            let app: *mut AnyObject = msg_send_id![NSApplication::class(), sharedApplication];
 
-            // ── NSWindow ─────────────────────────────────────────────────
+            // setActivationPolicy: returns BOOL (i8 on macOS)
+            let _: i8 = msg_send![app, setActivationPolicy: 0i64];
+
             let rect = NSRect {
                 origin: NSPoint { x: 200.0, y: 200.0 },
                 size:   NSSize  { width: width as f64, height: height as f64 },
@@ -61,38 +46,44 @@ impl PlatformWindow for MacosWindow {
                 | NSWindowStyleMask::Resizable
                 | NSWindowStyleMask::Miniaturizable;
 
-            // NSWindow::alloc() returns an Allocated<NSWindow>; cast to *mut AnyObject
-            // so we can keep using raw msg_send! for init (which has a non-standard
-            // selector that the typed API doesn't expose in 0.2).
-            let alloc: *mut AnyObject =
-                msg_send![NSWindow::class(), alloc];
-            let window: *mut AnyObject = msg_send![
-                alloc,
+            let window: *mut AnyObject = msg_send_id![
+                NSWindow::alloc(),
                 initWithContentRect: rect,
                 styleMask: style,
-                backing: 2u64, // NSBackingStoreBuffered == 2
+                backing: NSBackingStoreType::Buffered,
                 defer: false
             ];
 
             let ns_title = NSString::from_str(title);
             let _: () = msg_send![window, setTitle: &*ns_title];
-            let _: () = msg_send![
-                window,
-                makeKeyAndOrderFront: std::ptr::null::<AnyObject>()
-            ];
+            let _: () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<AnyObject>()];
 
             let view: *mut AnyObject = msg_send![window, contentView];
 
             let _: () = msg_send![app, activateIgnoringOtherApps: true];
 
+            // Run one event loop pass to actually show the window
+            let distant_past: *mut AnyObject = msg_send_id![
+                objc2_foundation::NSDate::class(), distantPast
+            ];
+            loop {
+                let event: *mut AnyObject = msg_send![
+                    app,
+                    nextEventMatchingMask: NSEventMask::Any,
+                    untilDate: distant_past,
+                    inMode: &*NSString::from_str("kCFRunLoopDefaultMode"),
+                    dequeue: true
+                ];
+                if event.is_null() { break; }
+                let _: () = msg_send![app, sendEvent: event];
+            }
+            let _: () = msg_send![app, updateWindows];
+
             eprintln!("[RetroX] Cocoa window initialized ({}x{})", width, height);
 
             MacosWindow {
-                app,
-                window,
-                view,
-                width,
-                height,
+                app, window, view,
+                width, height,
                 rgba_buf: vec![0u8; (width * height * 4) as usize],
             }
         }
@@ -109,64 +100,56 @@ impl PlatformWindow for MacosWindow {
         self.rgba_buf[..size].copy_from_slice(&buffer.data[..size]);
 
         unsafe {
-            // ── NSBitmapImageRep ─────────────────────────────────────────
-            // alloc via the class, then call the long init selector.
-            let alloc: *mut AnyObject =
-                msg_send![NSBitmapImageRep::class(), alloc];
-            let bmp: *mut AnyObject = msg_send![
-                alloc,
+            // Create NSBitmapImageRep from raw RGBA data
+            let color_space = NSString::from_str("NSDeviceRGBColorSpace");
+            let bmp: *mut AnyObject = msg_send_id![
+                NSBitmapImageRep::alloc(),
                 initWithBitmapDataPlanes: std::ptr::null_mut::<*mut u8>(),
-                pixelsWide:      w as i64,
-                pixelsHigh:      h as i64,
-                bitsPerSample:   8i64,
+                pixelsWide: w as i64,
+                pixelsHigh: h as i64,
+                bitsPerSample: 8i64,
                 samplesPerPixel: 4i64,
-                hasAlpha:        true,
-                isPlanar:        false,
-                colorSpaceName:  ns_string!("NSDeviceRGBColorSpace"),
-                bytesPerRow:     (w * 4) as i64,
-                bitsPerPixel:    32i64
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: &*color_space,
+                bytesPerRow: (w * 4) as i64,
+                bitsPerPixel: 32i64
             ];
 
+            // Copy pixels into bitmap
             let bitmap_data: *mut u8 = msg_send![bmp, bitmapData];
-            std::ptr::copy_nonoverlapping(
-                self.rgba_buf.as_ptr(),
-                bitmap_data,
-                size,
-            );
+            std::ptr::copy_nonoverlapping(self.rgba_buf.as_ptr(), bitmap_data, size);
 
-            // ── Draw into view ───────────────────────────────────────────
-            // NSGraphicsContext::currentContext is gated behind "NSGraphicsContext"
-            let ctx: *mut AnyObject =
-                msg_send![NSGraphicsContext::class(), currentContext];
-            if !ctx.is_null() {
-                let rect = NSRect {
-                    origin: NSPoint { x: 0.0, y: 0.0 },
-                    size:   NSSize  { width: w as f64, height: h as f64 },
-                };
-                let _: () = msg_send![bmp, drawInRect: rect];
-            }
-
+            // Lock focus on view and draw
+            let _: () = msg_send![self.view, lockFocus];
+            let rect = NSRect {
+                origin: NSPoint { x: 0.0, y: 0.0 },
+                size:   NSSize  { width: w as f64, height: h as f64 },
+            };
+            let _: () = msg_send![bmp, drawInRect: rect];
+            let _: () = msg_send![self.view, unlockFocus];
             let _: () = msg_send![self.window, flushWindow];
         }
     }
 
     fn next_event(&mut self) -> Option<Event> {
         unsafe {
+            let distant_past: *mut AnyObject = msg_send_id![
+                objc2_foundation::NSDate::class(), distantPast
+            ];
+
             loop {
                 let event: *mut AnyObject = msg_send![
                     self.app,
                     nextEventMatchingMask: NSEventMask::Any,
-                    untilDate: std::ptr::null::<AnyObject>(),
-                    inMode: ns_string!("kCFRunLoopDefaultMode"),
+                    untilDate: distant_past,
+                    inMode: &*NSString::from_str("kCFRunLoopDefaultMode"),
                     dequeue: true
                 ];
-                if event.is_null() {
-                    break;
-                }
+                if event.is_null() { break; }
 
-                // NSEventType is now behind the "NSEvent" feature — it resolves
-                // correctly because we imported NSEvent above.
                 let event_type: NSEventType = msg_send![event, type];
+
                 match event_type {
                     NSEventType::KeyDown => {
                         let keycode: u16 = msg_send![event, keyCode];
@@ -230,11 +213,11 @@ impl PlatformWindow for MacosWindow {
                 }
             }
 
-            // ── Resize detection ─────────────────────────────────────────
+            // Check for resize
             let frame: NSRect = msg_send![self.view, frame];
             let w = frame.size.width  as u32;
             let h = frame.size.height as u32;
-            if w != self.width || h != self.height {
+            if w > 0 && h > 0 && (w != self.width || h != self.height) {
                 self.width  = w;
                 self.height = h;
                 if let Ok(mut q) = EVENT_QUEUE.lock() {
@@ -244,9 +227,7 @@ impl PlatformWindow for MacosWindow {
         }
 
         if let Ok(mut q) = EVENT_QUEUE.lock() {
-            if !q.is_empty() {
-                return Some(q.remove(0));
-            }
+            if !q.is_empty() { return Some(q.remove(0)); }
         }
         None
     }
