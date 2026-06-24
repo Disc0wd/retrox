@@ -35,12 +35,32 @@ windows-sys = { version = "0.59", features = [
 ] }
 
 # ─────────────────────────────────────────────
-# macOS backend (Cocoa / Objective-C runtime)
+# macOS backend (Cocoa / objc2)
 # ─────────────────────────────────────────────
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.5"
-objc2-app-kit = "0.2"
-objc2-foundation = "0.2"
+[dependencies.objc2]
+version = "0.5"
+
+[dependencies.objc2-foundation]
+version = "0.2"
+features = ["alloc", "NSString", "NSGeometry"]
+
+[dependencies.objc2-app-kit]
+version = "0.2"
+features = [
+    # Base types needed by everything below
+    "NSResponder",      # required by NSApplication, NSWindow, NSView
+    "NSImageRep",       # required by NSBitmapImageRep
+    "NSGraphics",       # NSBackingStoreType, NSGraphicsContext colour-space names
+
+    # Concrete types used in macos.rs
+    "NSApplication",
+    "NSBitmapImageRep",
+    "NSEvent",
+    "NSGraphicsContext",
+    "NSScreen",
+    "NSView",
+    "NSWindow",
+]
 
 # ─────────────────────────────────────────────
 # build tools (shared)
