@@ -9,7 +9,11 @@ use objc2::runtime::AnyObject;
 use objc2::{msg_send, ClassType};
 use objc2_app_kit::{
     NSApplication,
-    NSBackingStoreType,  // lives behind the "NSGraphics" feature
+    // NSBackingStoreType::Buffered == 2 (NSBackingStoreBuffered).
+    // The constant is only compiled in when BOTH "NSGraphics" (for the type)
+    // AND "NSWindow" (for the impl block that adds Buffered) are enabled.
+    // Since we're calling initWithContentRect:styleMask:backing:defer: via
+    // raw msg_send! anyway, it's simpler and more robust to pass the integer.
     NSBitmapImageRep,    // lives behind "NSBitmapImageRep" + "NSImageRep" features
     NSEvent,
     NSEventMask,
@@ -66,7 +70,7 @@ impl PlatformWindow for MacosWindow {
                 alloc,
                 initWithContentRect: rect,
                 styleMask: style,
-                backing: NSBackingStoreType::Buffered,
+                backing: 2u64, // NSBackingStoreBuffered == 2
                 defer: false
             ];
 
