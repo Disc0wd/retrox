@@ -92,14 +92,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "retrox"
+name = "retrobrowser"
 version = "0.0.0"
 dependencies = [
  "cc",
  "libc",
+ "rnmdl",
  "wayland-client",
  "wayland-protocols",
 ]
+
+[[package]]
+name = "rnmdl"
+version = "0.0.0"
 
 [[package]]
 name = "rustix"

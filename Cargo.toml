@@ -1,22 +1,6 @@
-[package]
-name = "retrox"
-version = "0.0.0"
-edition = "2021"
-rust-version = "1.95.0"
-authors = ["RetroX Project"]
-description = "RNMDL GN-Z11 Parser, Validator and Graphical Renderer"
-license = "CC-BY-4.0"
-
-[[bin]]
-name = "retrox"
-path = "src/main.rs"
-
-[dependencies]
-
-[target.'cfg(target_os = "linux")'.dependencies]
-wayland-client   = "=0.31.14"
-wayland-protocols = { version = "=0.31.2", features = ["client", "staging"] }
-libc = "=0.2.186"
-
-[build-dependencies]
-cc = "1"
+[workspace]
+members = [
+    "rnmdl",
+    "retrobrowser",
+]
+resolver = "2"

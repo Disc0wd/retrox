@@ -1,7 +1,7 @@
 // ============================================================
-// RetroX Platform Abstraction Layer
-// Linux/Wayland primary. X11 fallback planned for future.
-// Wayland support via wayland-client =0.31.14
+// RetroBrowser Platform Abstraction Layer
+// Linux/Wayland primary. Windows (Win32) and macOS (Cocoa)
+// also supported. GPU acceleration planned for future release.
 // Rust 1.95.0 | Edition 2021 | FROZEN at GN-Z11
 // ============================================================
 
@@ -72,6 +72,8 @@ impl PixelBuffer {
     }
 }
 
+// ─── Platform Window Trait ─────────────────────────────────
+
 pub trait PlatformWindow {
     fn new(title: &str, width: u32, height: u32) -> Self where Self: Sized;
     fn present(&mut self, buffer: &PixelBuffer);
@@ -81,7 +83,19 @@ pub trait PlatformWindow {
     fn set_title(&mut self, title: &str);
 }
 
+// ─── Platform Selection ────────────────────────────────────
+
 #[cfg(target_os = "linux")]
 mod wayland;
 #[cfg(target_os = "linux")]
 pub use wayland::WaylandWindow as NativeWindow;
+
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::WindowsWindow as NativeWindow;
+
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::MacosWindow as NativeWindow;

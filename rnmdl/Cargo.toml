@@ -1,0 +1,18 @@
+[package]
+name = "rnmdl"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.95.0"
+authors = ["RetroX Project"]
+description = "RNMDL GN-Z11 document format — parser, validator, AST, terminal renderer"
+license = "CC-BY-4.0"
+
+[lib]
+name = "rnmdl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "retrox"
+path = "src/main.rs"
+
+[dependencies]

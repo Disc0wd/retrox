@@ -6,9 +6,9 @@
 // ============================================================
 
 use crate::platform::{PixelBuffer, PlatformWindow, NativeWindow, Event, Key, MouseButton};
-use crate::lexer::Lexer;
-use crate::parser::Parser;
-use crate::validator::Validator;
+use rnmdl::lexer::Lexer;
+use rnmdl::parser::Parser;
+use rnmdl::validator::Validator;
 use super::layout::{Layout, Element, MARGIN_X, NAV_H, STATUS_H, H1_SCALE, H2_SCALE, H3_SCALE, BODY_SCALE};
 use super::paint::{self, Color};
 use std::path::Path;

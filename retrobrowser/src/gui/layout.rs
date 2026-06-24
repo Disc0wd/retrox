@@ -5,7 +5,7 @@
 // Rust 1.95.0 | Edition 2021 | FROZEN at GN-Z11
 // ============================================================
 
-use crate::ast::Node;
+use rnmdl::ast::Node;
 use crate::font;
 use crate::image::stb::resize_stb;
 use crate::image::{Image, load_image};
