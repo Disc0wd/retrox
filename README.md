@@ -1,5 +1,12 @@
 # RetroX
 
+██████╗ ███████╗████████╗██████╗  ██████╗ ██╗  ██╗
+██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗╚██╗██╔╝
+██████╔╝█████╗     ██║   ██████╔╝██║   ██║ ╚███╔╝ 
+██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║ ██╔██╗ 
+██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝██╔╝ ██╗
+╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+                                                  
 **Permanent infrastructure for websites that should not rot.**
 
 RetroX is an experimental alternative web platform focused on permanence, ownership, privacy, and stable publishing. It is not nostalgia for old technology. It is an attempt to build web infrastructure where a site created today can still render correctly decades later — without being rewritten every time the modern web stack mutates.
