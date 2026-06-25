@@ -1,30 +1,31 @@
 // ============================================================
 // RetroBrowser macOS Platform (Cocoa)
-// Software framebuffer presented via NSBitmapImageRep.
-// No GPU required. Stable Cocoa API since macOS 10.0.
+// Software framebuffer → CGImage → CALayer.contents
+// No GPU required. Works on macOS 10.14+ (Mojave and later).
 // Rust 1.95.0 | Edition 2021 | FROZEN at GN-Z11
 // ============================================================
 //
-// objc2 0.5 raw-pointer style: every ObjC call goes through
-// msg_send! returning *mut AnyObject.  We deliberately avoid:
-//   - msg_send_id!   (requires Retained<T> / MaybeUnwrap)
-//   - T::alloc()     (requires IsAllocableAnyThread / MainThreadMarker)
-//   - NSBackingStoreType::Buffered  (needs dual feature gates)
-// Raw integer / pointer equivalents are used instead.
+// Rendering strategy:
+//   graphicsContextWithWindow: was removed in macOS 10.14 (always nil).
+//   lockFocusIfCanDraw returns NO on layer-backed views (default post-10.14).
+//   The correct modern approach for a software render loop:
+//     1. Build a CGImage from raw RGBA bytes via CoreGraphics C API.
+//     2. Set it as the `contents` of the view's backing CALayer.
+//     3. Call display on the layer to push it to screen immediately.
+//   This is zero-copy (CGDataProviderCreateWithData takes a pointer),
+//   stable since macOS 10.0, and is exactly what game/emulator renderers use.
 // ============================================================
 
 use objc2::runtime::AnyObject;
 use objc2::{msg_send, ClassType};
 use objc2_app_kit::{
-    NSApplication,      // feature: NSApplication + NSResponder
-    NSBitmapImageRep,   // feature: NSBitmapImageRep + NSImageRep
-    NSEvent,            // feature: NSEvent  (pulls in NSEventMask, NSEventType)
+    NSApplication,
+    NSEvent,
     NSEventMask,
     NSEventType,
-    NSGraphicsContext,  // feature: NSGraphicsContext
-    NSScreen,           // feature: NSScreen
-    NSView,             // feature: NSView   + NSResponder
-    NSWindow,           // feature: NSWindow + NSResponder
+    NSScreen,
+    NSView,
+    NSWindow,
     NSWindowStyleMask,
 };
 use objc2_foundation::{ns_string, NSPoint, NSRect, NSSize, NSString};
@@ -32,72 +33,108 @@ use objc2_foundation::{ns_string, NSPoint, NSRect, NSSize, NSString};
 use super::{Event, Key, MouseButton, PixelBuffer, PlatformWindow};
 use std::sync::Mutex;
 
+// ── CoreGraphics types/functions (available as a plain C lib on macOS) ───────
+// We link via the CoreGraphics framework that is always present.
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGColorSpaceCreateDeviceRGB() -> *mut std::ffi::c_void;
+    fn CGColorSpaceRelease(cs: *mut std::ffi::c_void);
+    fn CGDataProviderCreateWithData(
+        info: *mut std::ffi::c_void,
+        data: *const std::ffi::c_void,
+        size: usize,
+        release_data: Option<unsafe extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_void, usize)>,
+    ) -> *mut std::ffi::c_void;
+    fn CGDataProviderRelease(dp: *mut std::ffi::c_void);
+    fn CGImageCreate(
+        width: usize,
+        height: usize,
+        bits_per_component: usize,
+        bits_per_pixel: usize,
+        bytes_per_row: usize,
+        color_space: *mut std::ffi::c_void,
+        bitmap_info: u32,
+        provider: *mut std::ffi::c_void,
+        decode: *const std::ffi::c_void,
+        should_interpolate: bool,
+        intent: u32,
+    ) -> *mut std::ffi::c_void;
+    fn CGImageRelease(img: *mut std::ffi::c_void);
+}
+
+// kCGBitmapByteOrderDefault | kCGImageAlphaNoneSkipLast  = 0 | 4 = 4
+// Our buffer is RGBA: R G B A where A is ignored (opaque).
+const BITMAP_INFO_RGBA: u32 = 4;
+// kCGRenderingIntentDefault
+const RENDERING_INTENT_DEFAULT: u32 = 0;
+
 static EVENT_QUEUE: Mutex<Vec<Event>> = Mutex::new(Vec::new());
 
 pub struct MacosWindow {
     app:      *mut AnyObject,
     window:   *mut AnyObject,
     view:     *mut AnyObject,
+    layer:    *mut AnyObject,
     width:    u32,
     height:   u32,
     rgba_buf: Vec<u8>,
 }
 
-// SAFETY: MacosWindow is only ever created and used on the main thread.
-// The raw pointers are Cocoa objects whose lifetimes are managed by ObjC ARC.
 unsafe impl Send for MacosWindow {}
 
 impl PlatformWindow for MacosWindow {
     fn new(title: &str, width: u32, height: u32) -> Self {
         unsafe {
             // ── NSApplication ────────────────────────────────────────────
-            // msg_send! (not msg_send_id!) — returns *mut AnyObject directly.
             let app: *mut AnyObject =
                 msg_send![NSApplication::class(), sharedApplication];
-            // NSApplicationActivationPolicyRegular == 0
-            let _: bool = msg_send![app, setActivationPolicy: 0i64]; // returns BOOL (type code 'c'), not void
+            let _: bool = msg_send![app, setActivationPolicy: 0i64];
 
             // ── NSWindow ─────────────────────────────────────────────────
             let rect = NSRect {
                 origin: NSPoint { x: 200.0, y: 200.0 },
                 size:   NSSize  { width: width as f64, height: height as f64 },
             };
-
             let style = NSWindowStyleMask::Titled
                 | NSWindowStyleMask::Closable
                 | NSWindowStyleMask::Resizable
                 | NSWindowStyleMask::Miniaturizable;
 
-            // alloc via msg_send! on the *Class* object — this avoids
-            // NSWindow::alloc() which requires IsAllocableAnyThread
-            // (not satisfied by MainThreadOnly in objc2 0.5).
             let alloc: *mut AnyObject = msg_send![NSWindow::class(), alloc];
             let window: *mut AnyObject = msg_send![
                 alloc,
                 initWithContentRect: rect,
                 styleMask: style,
-                // NSBackingStoreBuffered == 2. Using the integer avoids the
-                // dual feature-gate (NSGraphics + NSWindow) that
-                // NSBackingStoreType::Buffered requires.
-                backing: 2u64,
+                backing: 2u64,  // NSBackingStoreBuffered
                 defer: false
             ];
 
             let ns_title = NSString::from_str(title);
             let _: () = msg_send![window, setTitle: &*ns_title];
+
+            // ── Enable layer-backing on the content view ─────────────────
+            // Required for the CALayer contents approach to work.
+            let view: *mut AnyObject = msg_send![window, contentView];
+            let _: () = msg_send![view, setWantsLayer: true];
+
+            // Grab the backing CALayer.
+            let layer: *mut AnyObject = msg_send![view, layer];
+
+            // Flip the layer coordinate system to match our top-left origin.
+            // CALayer default is bottom-left; NSView is also bottom-left but
+            // NSBitmapImageRep data comes top-left from our renderer.
+            let _: () = msg_send![layer, setGeometryFlipped: true];
+
             let _: () = msg_send![
                 window,
                 makeKeyAndOrderFront: std::ptr::null::<AnyObject>()
             ];
-
-            let view: *mut AnyObject = msg_send![window, contentView];
-
             let _: () = msg_send![app, activateIgnoringOtherApps: true];
 
             eprintln!("[RetroX] Cocoa window initialized ({}x{})", width, height);
 
             MacosWindow {
-                app, window, view,
+                app, window, view, layer,
                 width, height,
                 rgba_buf: vec![0u8; (width * height * 4) as usize],
             }
@@ -105,9 +142,9 @@ impl PlatformWindow for MacosWindow {
     }
 
     fn present(&mut self, buffer: &PixelBuffer) {
-        let w = buffer.width;
-        let h = buffer.height;
-        let size = (w * h * 4) as usize;
+        let w = buffer.width as usize;
+        let h = buffer.height as usize;
+        let size = w * h * 4;
 
         if self.rgba_buf.len() < size {
             self.rgba_buf.resize(size, 0);
@@ -115,80 +152,51 @@ impl PlatformWindow for MacosWindow {
         self.rgba_buf[..size].copy_from_slice(&buffer.data[..size]);
 
         unsafe {
-            // ── NSBitmapImageRep ─────────────────────────────────────────
-            let alloc: *mut AnyObject =
-                msg_send![NSBitmapImageRep::class(), alloc];
-            let bmp: *mut AnyObject = msg_send![
-                alloc,
-                initWithBitmapDataPlanes: std::ptr::null_mut::<*mut u8>(),
-                pixelsWide:      w as i64,
-                pixelsHigh:      h as i64,
-                bitsPerSample:   8i64,
-                samplesPerPixel: 4i64,
-                hasAlpha:        true,
-                isPlanar:        false,
-                colorSpaceName:  ns_string!("NSDeviceRGBColorSpace"),
-                bytesPerRow:     (w * 4) as i64,
-                bitsPerPixel:    32i64
-            ];
-
-            let bitmap_data: *mut u8 = msg_send![bmp, bitmapData];
-            std::ptr::copy_nonoverlapping(
-                self.rgba_buf.as_ptr(),
-                bitmap_data,
+            // ── Build CGImage from raw RGBA bytes ─────────────────────────
+            let cs = CGColorSpaceCreateDeviceRGB();
+            let provider = CGDataProviderCreateWithData(
+                std::ptr::null_mut(),
+                self.rgba_buf.as_ptr() as *const std::ffi::c_void,
                 size,
+                None, // data is owned by rgba_buf; no release callback needed
             );
+            let cg_image = CGImageCreate(
+                w, h,
+                8,      // bits per component
+                32,     // bits per pixel
+                w * 4,  // bytes per row
+                cs,
+                BITMAP_INFO_RGBA,
+                provider,
+                std::ptr::null(),
+                false,
+                RENDERING_INTENT_DEFAULT,
+            );
+            CGDataProviderRelease(provider);
+            CGColorSpaceRelease(cs);
 
-            // ── Draw into view ───────────────────────────────────────────
-            // lockFocusIfCanDraw silently returns NO on non-opaque views in
-            // newer macOS. The reliable render-loop approach is:
-            //   1. Get a graphics context for the window
-            //   2. saveGraphicsState / make it current
-            //   3. draw the bitmap rep (returns BOOL per NSImageRep docs)
-            //   4. restoreGraphicsState
-            //   5. flushWindow → blit backing store to screen
-            let gfx_ctx: *mut AnyObject = msg_send![
-                NSGraphicsContext::class(),
-                graphicsContextWithWindow: self.window
-            ];
-            eprintln!("[RetroX] present: bmp={:?} gfx_ctx={:?} w={} h={}", bmp, gfx_ctx, w, h);
-            if !gfx_ctx.is_null() {
-                let _: () = msg_send![NSGraphicsContext::class(), saveGraphicsState];
-                let _: () = msg_send![
-                    NSGraphicsContext::class(),
-                    setCurrentContext: gfx_ctx
-                ];
-                let rect = NSRect {
-                    origin: NSPoint { x: 0.0, y: 0.0 },
-                    size:   NSSize  { width: w as f64, height: h as f64 },
-                };
-                let drew: bool = msg_send![bmp, drawInRect: rect];
-                eprintln!("[RetroX] drawInRect returned: {}", drew);
-                let _: () = msg_send![NSGraphicsContext::class(), restoreGraphicsState];
-                let _: () = msg_send![self.window, flushWindow];
-            } else {
-                eprintln!("[RetroX] graphicsContextWithWindow returned nil — skipping draw");
-            }
+            // ── Push to screen via CALayer.contents ───────────────────────
+            // `contents` accepts a CGImageRef (toll-free bridged to id).
+            // After setting it, call display to commit immediately rather
+            // than waiting for the next run-loop cycle.
+            let _: () = msg_send![self.layer, setContents: cg_image as *mut AnyObject];
+            let _: () = msg_send![self.layer, display];
+
+            CGImageRelease(cg_image);
         }
     }
 
     fn next_event(&mut self) -> Option<Event> {
         unsafe {
-            // ── Pump the NSApplication event queue (non-blocking) ────────
-            // untilDate: nil  →  return immediately if no event waiting.
-            // Do NOT use msg_send_id! here; it returns *mut AnyObject fine
-            // via msg_send! because NSEvent is not an init/copy/new method.
             loop {
                 let event: *mut AnyObject = msg_send![
                     self.app,
                     nextEventMatchingMask: NSEventMask::Any,
-                    untilDate: std::ptr::null::<AnyObject>(), // nil = non-blocking
+                    untilDate: std::ptr::null::<AnyObject>(),
                     inMode: ns_string!("kCFRunLoopDefaultMode"),
                     dequeue: true
                 ];
-                if event.is_null() {
-                    break;
-                }
+                if event.is_null() { break; }
 
                 let event_type: NSEventType = msg_send![event, type];
                 match event_type {
@@ -268,9 +276,7 @@ impl PlatformWindow for MacosWindow {
         }
 
         if let Ok(mut q) = EVENT_QUEUE.lock() {
-            if !q.is_empty() {
-                return Some(q.remove(0));
-            }
+            if !q.is_empty() { return Some(q.remove(0)); }
         }
         None
     }
