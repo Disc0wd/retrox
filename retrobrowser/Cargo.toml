@@ -56,7 +56,6 @@ features = [
     "NSApplication",
     "NSBitmapImageRep",
     "NSEvent",
-    "NSGraphicsContext",
     "NSScreen",
     "NSView",
     "NSWindow",
