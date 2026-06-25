@@ -47,16 +47,9 @@ features = ["alloc", "NSString", "NSGeometry"]
 [dependencies.objc2-app-kit]
 version = "0.2"
 features = [
-    # Base types needed by everything below
-    "NSResponder",      # required by NSApplication, NSWindow, NSView
-    "NSImageRep",       # required by NSBitmapImageRep
-    "NSGraphics",       # colour-space names; NSBackingStoreType type def
-    "NSGraphicsContext", # NSGraphicsContext class (graphicsContextWithWindow: etc.)
-
-    # Concrete types used in macos.rs
+    "NSResponder",   # required by NSApplication, NSWindow, NSView
     "NSApplication",
-    "NSBitmapImageRep",
-    "NSEvent",
+    "NSEvent",       # pulls in NSEventMask, NSEventType
     "NSScreen",
     "NSView",
     "NSWindow",
