@@ -21,7 +21,6 @@ use objc2_app_kit::{
     NSEvent,            // feature: NSEvent  (pulls in NSEventMask, NSEventType)
     NSEventMask,
     NSEventType,
-    NSGraphicsContext,  // feature: NSGraphicsContext
     NSScreen,           // feature: NSScreen
     NSView,             // feature: NSView   + NSResponder
     NSWindow,           // feature: NSWindow + NSResponder
@@ -116,9 +115,6 @@ impl PlatformWindow for MacosWindow {
 
         unsafe {
             // ── NSBitmapImageRep ─────────────────────────────────────────
-            // Same pattern: alloc via msg_send! on the class, avoiding
-            // NSBitmapImageRep::alloc() which also hits the MainThreadOnly
-            // / IsAllocableAnyThread wall in objc2 0.5.
             let alloc: *mut AnyObject =
                 msg_send![NSBitmapImageRep::class(), alloc];
             let bmp: *mut AnyObject = msg_send![
@@ -143,17 +139,22 @@ impl PlatformWindow for MacosWindow {
             );
 
             // ── Draw into view ───────────────────────────────────────────
-            let ctx: *mut AnyObject =
-                msg_send![NSGraphicsContext::class(), currentContext];
-            if !ctx.is_null() {
+            // currentContext is only valid inside drawRect: — it's always
+            // null when called from a game/render loop.  Instead we must:
+            //   1. lockFocus on the view  → creates + installs a valid ctx
+            //   2. draw the bitmap rep
+            //   3. unlockFocus
+            //   4. flushWindow            → blit to screen
+            let did_lock: bool = msg_send![self.view, lockFocusIfCanDraw];
+            if did_lock {
                 let rect = NSRect {
                     origin: NSPoint { x: 0.0, y: 0.0 },
                     size:   NSSize  { width: w as f64, height: h as f64 },
                 };
                 let _: () = msg_send![bmp, drawInRect: rect];
+                let _: () = msg_send![self.view, unlockFocus];
+                let _: () = msg_send![self.window, flushWindow];
             }
-
-            let _: () = msg_send![self.window, flushWindow];
         }
     }
 
