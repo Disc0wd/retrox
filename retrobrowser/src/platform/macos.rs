@@ -151,6 +151,7 @@ impl PlatformWindow for MacosWindow {
                 NSGraphicsContext::class(),
                 graphicsContextWithWindow: self.window
             ];
+            eprintln!("[RetroX] present: bmp={:?} gfx_ctx={:?} w={} h={}", bmp, gfx_ctx, w, h);
             if !gfx_ctx.is_null() {
                 let _: () = msg_send![NSGraphicsContext::class(), saveGraphicsState];
                 let _: () = msg_send![
@@ -161,9 +162,12 @@ impl PlatformWindow for MacosWindow {
                     origin: NSPoint { x: 0.0, y: 0.0 },
                     size:   NSSize  { width: w as f64, height: h as f64 },
                 };
-                let _: bool = msg_send![bmp, drawInRect: rect];
+                let drew: bool = msg_send![bmp, drawInRect: rect];
+                eprintln!("[RetroX] drawInRect returned: {}", drew);
                 let _: () = msg_send![NSGraphicsContext::class(), restoreGraphicsState];
                 let _: () = msg_send![self.window, flushWindow];
+            } else {
+                eprintln!("[RetroX] graphicsContextWithWindow returned nil — skipping draw");
             }
         }
     }
