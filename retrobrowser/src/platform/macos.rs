@@ -55,7 +55,7 @@ impl PlatformWindow for MacosWindow {
             let app: *mut AnyObject =
                 msg_send![NSApplication::class(), sharedApplication];
             // NSApplicationActivationPolicyRegular == 0
-            let _: () = msg_send![app, setActivationPolicy: 0i64];
+            let _: bool = msg_send![app, setActivationPolicy: 0i64]; // returns BOOL (type code 'c'), not void
 
             // ── NSWindow ─────────────────────────────────────────────────
             let rect = NSRect {
