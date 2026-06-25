@@ -50,7 +50,8 @@ features = [
     # Base types needed by everything below
     "NSResponder",      # required by NSApplication, NSWindow, NSView
     "NSImageRep",       # required by NSBitmapImageRep
-    "NSGraphics",       # NSGraphicsContext colour-space names; NSBackingStoreType type def
+    "NSGraphics",       # colour-space names; NSBackingStoreType type def
+    "NSGraphicsContext", # NSGraphicsContext class (graphicsContextWithWindow: etc.)
 
     # Concrete types used in macos.rs
     "NSApplication",
