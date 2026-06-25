@@ -21,6 +21,7 @@ use objc2_app_kit::{
     NSEvent,            // feature: NSEvent  (pulls in NSEventMask, NSEventType)
     NSEventMask,
     NSEventType,
+    NSGraphicsContext,  // feature: NSGraphicsContext
     NSScreen,           // feature: NSScreen
     NSView,             // feature: NSView   + NSResponder
     NSWindow,           // feature: NSWindow + NSResponder
@@ -139,20 +140,29 @@ impl PlatformWindow for MacosWindow {
             );
 
             // ── Draw into view ───────────────────────────────────────────
-            // currentContext is only valid inside drawRect: — it's always
-            // null when called from a game/render loop.  Instead we must:
-            //   1. lockFocus on the view  → creates + installs a valid ctx
-            //   2. draw the bitmap rep
-            //   3. unlockFocus
-            //   4. flushWindow            → blit to screen
-            let did_lock: bool = msg_send![self.view, lockFocusIfCanDraw];
-            if did_lock {
+            // lockFocusIfCanDraw silently returns NO on non-opaque views in
+            // newer macOS. The reliable render-loop approach is:
+            //   1. Get a graphics context for the window
+            //   2. saveGraphicsState / make it current
+            //   3. draw the bitmap rep (returns BOOL per NSImageRep docs)
+            //   4. restoreGraphicsState
+            //   5. flushWindow → blit backing store to screen
+            let gfx_ctx: *mut AnyObject = msg_send![
+                NSGraphicsContext::class(),
+                graphicsContextWithWindow: self.window
+            ];
+            if !gfx_ctx.is_null() {
+                let _: () = msg_send![NSGraphicsContext::class(), saveGraphicsState];
+                let _: () = msg_send![
+                    NSGraphicsContext::class(),
+                    setCurrentContext: gfx_ctx
+                ];
                 let rect = NSRect {
                     origin: NSPoint { x: 0.0, y: 0.0 },
                     size:   NSSize  { width: w as f64, height: h as f64 },
                 };
-                let _: () = msg_send![bmp, drawInRect: rect];
-                let _: () = msg_send![self.view, unlockFocus];
+                let _: bool = msg_send![bmp, drawInRect: rect];
+                let _: () = msg_send![NSGraphicsContext::class(), restoreGraphicsState];
                 let _: () = msg_send![self.window, flushWindow];
             }
         }
