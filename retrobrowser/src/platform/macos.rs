@@ -64,10 +64,10 @@ extern "C" {
 
 // kCGBitmapByteOrderDefault | kCGImageAlphaNoneSkipLast  = 0 | 4 = 4
 // Our buffer is RGBA: R G B A where A is ignored (opaque).
-// kCGBitmapByteOrder32Big (0x3000) | kCGImageAlphaNoneSkipLast (4) = 0x3004
-// This tells CoreGraphics the bytes are R,G,B,X in memory order (big-endian 32-bit),
-// which matches our RGBA buffer on both Intel and Apple Silicon macs.
-const BITMAP_INFO_RGBA: u32 = 0x3004;
+// kCGBitmapByteOrder32Big = 4<<12 = 0x4000, kCGImageAlphaNoneSkipLast = 5 → 0x4005
+
+
+const BITMAP_INFO_RGBA: u32 = 0x4005;
 // kCGRenderingIntentDefault
 const RENDERING_INTENT_DEFAULT: u32 = 0;
 
