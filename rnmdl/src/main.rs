@@ -16,6 +16,7 @@ mod lexer;
 mod parser;
 mod validator;
 mod renderer;
+mod versions;
 
 use std::env;
 use std::fs;
